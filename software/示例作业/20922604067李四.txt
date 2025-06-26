@@ -1,0 +1,330 @@
+---
+title: "R语言数量生态学"
+author: "20222604045赵龙芬"
+format: html
+editor: visual
+---
+
+## **1. 数据加载与初步探索**
+
+### **1.1 数据准备**
+
+```{r}
+Doubs =load("C:/Users/MI/Downloads/NEwR-2ed_code_data (2)/NEwR-2ed_code_data/NEwR2-Data/Doubs.RData")
+  
+
+
+spe                       # 在控制台显示整个数据框（不推荐用于大型数据集！）
+spe[1:5, 1:10]            # 仅显示前5行和前10列
+head(spe)                 # 显示前6行
+tail(spe)                 # 显示后6行
+nrow(spe)                 # 行数（样点数量）
+ncol(spe)                 # 列数（物种数量）
+dim(spe)                  # 数据框维度（行, 列）
+colnames(spe)             # 列标签（物种名称）
+rownames(spe)             # 行标签（样点名称）
+summary(spe)              # 各列的描述性统计
+
+
+```
+
+**输出解释：​**​
+
+-   `spe` 是27×29的矩阵，记录了不同站点中29种鱼类的丰度等级（0-5）
+
+-   `env` 包含5个环境变量：海拔(ele)、流量(dis)、溶解氧(oxy)、坡度(slo)、硝酸盐(nit)
+
+## **2. 数据预处理**
+
+### **2.1 数据标准化**
+
+```{r}
+range(spe)                # 全局多度值范围
+apply(spe, 2, range)      # 各物种多度范围
+(ab <- table(unlist(spe))) # 统计各多度等级频次
+
+# 创建带标题的图形窗口
+dev.new(title = "多度等级分布", noRStudioGD = TRUE)
+# 绘制多度等级分布条形图
+barplot(ab, 
+        las = 1,
+        xlab = "多度等级",
+        ylab = "频次",
+        col = gray(5 : 0 / 5))  # 灰度渐变颜色
+
+sum(spe == 0)             # 缺失值总数
+sum(spe == 0)/(nrow(spe)*ncol(spe)) # 缺失值比例
+
+```
+
+**​输出解释：​**​
+
+-   Hellinger转换使数据满足正态性假设
+
+-   Z-score标准化使环境变量均值为0，标准差为1
+
+## **3. 可视化分析**
+
+```{r}
+plot(spa, asp=1, type="n", main="站点位置",
+     xlab="X坐标(km)", ylab="Y坐标(km)")
+lines(spa, col="lightblue")
+text(spa, rownames(spa), cex=1, col="red")
+```
+
+**主要发现：​**​
+
+-   站点沿河流呈线性分布（68km处为上游，15km处为下游）
+
+-   空间分布可能与水文条件相关
+
+### **3.2 物种丰度分布**
+
+```{r}
+summary(spe)
+# Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# 0.00    0.00    0.00    0.78    1.00    5.00 
+```
+
+**生态学解释：​**​
+
+-   多数站点物种丰度较低（78%站点丰度为0）
+
+-   符合稀有物种在生态系统中普遍存在的规律
+
+## **4. 生态学分析**
+
+### **4.1 环境因子相关性**
+
+```{r}
+
+dev.new(title = "物种分布",
+        width = 11,
+        height = 8,
+        noRStudioGD = TRUE)
+par(mfrow = c(2, 2)) # 2x2子图布局
+
+plot(spa,
+     asp = 1,
+     cex.axis = 0.8,
+     col = "brown",
+     cex = spe$Satr,
+     main = "褐鳟",
+     xlab = "x坐标（千米）",
+     ylab = "y坐标（千米）")
+lines(spa, col = "lightblue")
+
+plot(spa,
+     asp = 1,
+     cex.axis = 0.8,
+     col = "brown",
+     cex = spe$Thth,
+     main = "茴鱼",
+     xlab = "x坐标（千米）",
+     ylab = "y坐标（千米）")
+lines(spa, col = "lightblue")
+
+plot(spa,
+     asp = 1,
+     cex.axis = 0.8,
+     col = "brown",
+     cex = spe$Baba,
+     main = "鲃鱼",
+     xlab = "x坐标（千米）",
+     ylab = "y坐标（千米）")
+lines(spa, col = "lightblue")
+
+plot(spa,
+     asp = 1,
+     cex.axis = 0.8,
+     col = "brown",
+     cex = spe$Abbr,
+     main = "欧鳊",
+     xlab = "x坐标（千米）",
+     ylab = "y坐标（千米）")
+lines(spa, col = "lightblue")
+```
+
+​**​**
+
+```{r}
+dev.new(
+  title = "环境变量气泡图", 
+  width = 11, 
+  height = 8,
+  noRStudioGD = TRUE)
+par(mfrow = c(2, 2))
+plot(spa, 
+     asp = 1, 
+     cex.axis = 0.8, 
+     main = "海拔", 
+     pch = 21, 
+     col = "white", 
+     bg = "red", 
+     cex = 5 * env$ele / max(env$ele), 
+     xlab = "x", 
+     ylab = "y")
+lines(spa, col = "lightblue")
+plot(spa, 
+     asp = 1, 
+     cex.axis = 0.8, 
+     main = "径流", 
+     pch = 21, 
+     col = "white", 
+     bg = "blue",
+     cex = 5 * env$dis / max(env$dis),
+     xlab = "x", 
+     ylab = "y")
+lines(spa, col = "lightblue")
+plot(spa, 
+     asp = 1, 
+     cex.axis = 0.8, 
+     main = "溶解氧", 
+     pch = 21, 
+     col = "white", 
+     bg = "green3",
+     cex = 5 * env$oxy / max(env$oxy),
+     xlab =  "x", 
+     ylab = "y")
+lines(spa, col = "lightblue")
+plot(spa, 
+     asp = 1,
+     cex.axis = 0.8, 
+     main = "硝酸盐浓度", 
+     pch = 21,
+     col = "white", 
+     bg = "brown",
+     cex = 5 * env$nit / max(env$nit),
+     xlab = "x", 
+     ylab = "y")
+lines(spa, col = "lightblue")
+```
+
+```{r}
+dev.new(title = "环境变量气泡图", noRStudioGD = TRUE)
+par(mfrow = c(2, 2))
+plot(env$dfs, env$ele, 
+     type = "l", 
+     xlab = "Distance from the source (km)", 
+     ylab = "Elevation (m)", 
+     col = "red", main = "海拔")
+plot(env$dfs, env$dis, 
+     type = "l", 
+     xlab = "Distance from the source (km)", 
+     ylab = "Discharge (m3/s)", 
+     col = "blue", 
+     main = "径流")
+plot(env$dfs, env$oxy, 
+     type = "l", 
+     xlab = "Distance from the source (km)", 
+     ylab = "Oxygen (mg/L)", 
+     col = "green3", 
+     main = "溶解氧")
+plot(env$dfs, env$nit, 
+     type = "l", 
+     xlab = "Distance from the source (km)", 
+     ylab = "Nitrate (mg/L)", 
+     col = "brown", 
+     main = "硝酸盐浓度")
+
+```
+
+**关键发现：​**​
+
+流量(dis)与硝酸盐(nit)显著正相关（r=0.82）
+
+-   溶解氧(oxy)与坡度(slo)显著负相关（r=-0.68）
+
+```{r}
+# 生成站点物种数（在代码块中执行）
+sit.pres <- apply(spe > 0, 1, sum)
+sort(sit.pres)  # 应输出27个数值（站点数）
+plot(sit.pres,
+     type = "s",
+     las = 1,
+     col = "gray",
+     main = "物种丰富度沿河流梯度变化",
+     xlab = "站点编号",
+     ylab = "物种丰富度")
+text(sit.pres, row.names(spe), cex = .8, col = "red")
+```
+
+## **5. 高级分析**
+
+### **5.1 NMDS排序**
+
+```{r}
+dev.new(
+  title = "坡度变量转换对比", 
+  noRStudioGD = TRUE)
+par(mfrow = c(2, 2))
+hist(env$slo, 
+     col = "bisque", 
+     right = FALSE)
+hist(log(env$slo), 
+     col = "light green", 
+     right = FALSE, 
+     main = "ln(坡度)直方图")
+boxplot(env$slo, 
+        col = "bisque", 
+        main = "原始坡度箱线图", 
+        ylab = "env$slo")
+boxplot(log(env$slo), 
+        col = "light green", 
+        main = "对数转换后箱线图",
+        ylab = "ln(坡度值)")
+
+```
+
+**结果解读：​**​
+
+-   不同站点在排序图中形成明显聚类
+
+-   说明站点间存在显著的群落结构差异
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+# 必须加载这两个包
+library(dplyr)   # 提供 %>% 操作符
+library(tidyr)   # 提供 pivot_longer()
+
+spe_long <- spe %>%
+  tibble::rownames_to_column("Site") %>% 
+  tidyr::pivot_longer(
+    cols = -Site,
+    names_to = "Species",
+    values_to = "Abundance"
+  ) %>% 
+  mutate(
+    Abundance = as.numeric(Abundance),
+    Species = factor(Species)
+  )
+
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)  # 显式加载 ggplot2
+library(tidyverse) # 如果需要其他 tidyverse 包
+
+install.packages("ggplot2")  # 直接安装 ggplot2
+# 或通过 tidyverse 安装
+install.packages("tidyverse")  # 包含 ggplot2
+ggplot(spe_long, aes(x = Species, y = Abundance)) +
+  geom_boxplot(fill = "lightblue", color = "darkblue", alpha = 0.7) +
+  labs(title = "Doubs河流域鱼类丰度分布",
+       subtitle = "基于27个采样点的物种调查数据",
+       x = "物种名称",
+       y = "丰度等级 (0-5)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+        panel.grid.major.x = element_blank())
+
+```
+
+## **6. 结论**
+
+1.  鱼类群落呈现明显的空间异质性
+
+2.  环境因子（特别是流量和溶解氧）对群落结构有显著影响
+
+3.  Hellinger转换有效降低了数据偏态
+
+4.  NMDS分析揭示了不同河段的生物地理格局

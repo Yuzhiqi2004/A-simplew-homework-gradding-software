@@ -1,0 +1,219 @@
+---
+title: "动态分析"
+author: "20222604025蒋莹"
+date: "2025-04-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+# 加载tidyverse系列包
+library(tidyverse)
+library(vegan)
+library(leaflet)
+library(patchwork) # 用于组合图形
+load("D:/探索性数据分析/Doubs.RData")
+
+#数据结构
+#spe 数据框：
+#行数（nrow(spe)）：表示采样站点的数量。
+#列数（ncol(spe)）：表示物种的数量。
+#每行代表一个采样站点，每列代表一个物种，单元格中的值表示该物种在对应站点的多度值（如个体数、生物量等）。
+#列标签（colnames(spe)）是物种的名称，行标签（rownames(spe)）是站点的名称。
+#spa 数据框：
+#包含站点的空间坐标信息，假设其列名为 X 和 Y，分别表示站点的横坐标和纵坐标。
+#将其转换为 spa_df 数据框，添加了 Site 列作为行名，便于与物种数据进行关联。
+#spe_long 数据框：
+#将 spe 数据框从宽格式转换为长格式，包含三列：Site（站点名）、Species（物种名）和 Abundance（多度值）。
+#这种格式便于对每个物种在每个站点的多度值进行分析和可视化。
+
+# 查看数据对象
+ls() # 列出工作目录中的对象
+# 查看物种数据框
+spe # 显示整个数据框（不推荐用于大型数据集）
+spe[1:5, 1:10] # 显示前5行和前10列
+head(spe) # 显示前6行
+tail(spe) # 显示最后6行
+
+# 数据框维度
+nrow(spe) # 行数（站点数）
+ncol(spe) # 列数（物种数）
+dim(spe)  # 数据框维度（行数, 列数）
+
+# 数据框标签
+colnames(spe) # 列标签（物种名）
+rownames(spe) # 行标签（站点名）
+
+# 数据框统计
+summary(spe) # 各列的描述性统计
+# 多度值的最小值和最大值
+range(spe)
+
+# 每个物种的最小值和最大值
+apply(spe, 2, range)
+
+# 统计各多度等级的出现次数
+(ab <- table(unlist(spe)))
+
+colnames(spa)  # 假设返回 [1] "X" "Y"
+
+# 创建站点元数据（根据实际列名调整）
+spa_df <- as_tibble(spa, rownames = "Site") %>% 
+  rename(x = X, y = Y)  # 与colnames(spa)结果一致
+spe_long <- spe %>% 
+  rownames_to_column("Site") %>% 
+  pivot_longer(-Site, names_to = "Species", values_to = "Abundance")
+
+# 创建站点元数据
+spa_df <- as_tibble(spa, rownames = "Site") %>% 
+  rename(x = X, y = Y)
+
+
+# 数据预处理 --------------------------------------------------------------
+# 将物种数据转换为长格式
+spe_long <- spe %>% 
+  rownames_to_column("Site") %>% 
+  pivot_longer(-Site, names_to = "Species", values_to = "Abundance")
+
+# 创建站点元数据
+spa_df <- as_tibble(spa, rownames = "Site") %>% 
+  rename(x = X, y =Y)
+
+# 1. 多度分布条形图 -------------------------------------------------------
+ab_counts <- table(unlist(spe))
+ab_data <- tibble(
+  Abundance = names(ab_counts) %>% as.numeric(),
+  Frequency = as.numeric(ab_counts)
+)
+
+p1 <- ggplot(ab_data, aes(x = Abundance, y = Frequency)) +
+  geom_col(fill = gray(5:0 / 5), width = 0.7) +
+  labs(title = "多度等级分布", x = "多度等级", y = "频次") +
+  theme_minimal(base_size = 12) +
+  theme(axis.text = element_text(angle = 0, hjust = 0.5))
+
+# 2. 站点位置图 ----------------------------------------------------------
+p2 <- ggplot(spa_df, aes(x = x, y = y)) +
+  # 主数据流图层
+  geom_path(color = "lightblue", linewidth = 0.8) +
+  geom_text(aes(label = Site), color = "red", size = 3, check_overlap = TRUE) +
+  
+  # 独立文本标注（不依赖数据框）
+  annotate("text", x = 68, y = 20, label = "上游", color = "red", size = 5) +
+  annotate("text", x = 15, y = 35, label = "下游", color = "red", size = 5) +
+  
+  # 坐标与主题设置
+  labs(title = "站点位置图", x = "x坐标(公里)", y = "y坐标(公里)") +
+  coord_fixed(ratio = 1) +
+  theme_minimal()
+
+# 3. 物种分布图（使用分面绘图）--------------------------------------------
+selected_species <- c("Satr", "Thth", "Baba", "Abbr")
+spe_sub <- spe_long %>% 
+  filter(Species %in% selected_species) %>% 
+  left_join(spa_df, by = "Site")
+
+p3 <- ggplot(spe_sub, aes(x = x, y = y)) +
+  geom_path(data = spa_df, color = "lightblue", linewidth = 0.8) +
+  geom_point(aes(size = Abundance), color = "brown", alpha = 0.7) +
+  facet_wrap(~ Species, ncol = 2, labeller = labeller(
+    Species = c(Satr = "褐鳟", Thth = "茴鱼", Baba = "魮鱼", Abbr = "欧鳊")
+  )) +
+  scale_size_continuous(range = c(1, 5)) +
+  labs(x = "x坐标(公里)", y = "y坐标(公里)") +
+  coord_fixed(ratio = 1) +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+# 4. 物种频率直方图 ------------------------------------------------------
+species_stats <- spe_long %>% 
+  group_by(Species) %>% 
+  summarise(
+    Presence = sum(Abundance > 0),
+    RelFreq = 100 * Presence / nrow(spe)
+  )
+
+p4a <- ggplot(species_stats, aes(x = Presence)) +
+  geom_histogram(binwidth = 5, fill = "bisque", color = "black", 
+                 boundary = 0, closed = "left") +
+  labs(title = "物种出现次数", x = "出现次数", y = "物种数") +
+  scale_x_continuous(breaks = seq(0, 30, by = 5)) +
+  theme_minimal()
+
+p4b <- ggplot(species_stats, aes(x = RelFreq)) +
+  geom_histogram(binwidth = 10, fill = "bisque", color = "black",
+                 boundary = 0, closed = "left") +
+  labs(title = "物种相对频率", x = "出现频率(%)", y = "物种数") +
+  scale_x_continuous(breaks = seq(0, 100, by = 10)) +
+  theme_minimal()
+
+p4 <- p4a + p4b + plot_layout(ncol = 2)
+
+# 5. 物种丰富度分析 ------------------------------------------------------
+site_richness <- spe_long %>% 
+  filter(Abundance > 0) %>% 
+  group_by(Site) %>% 
+  summarise(Richness = n_distinct(Species)) %>% 
+  left_join(spa_df, by = "Site")
+
+p5a <- ggplot(site_richness, aes(x = as.numeric(Site), y = Richness)) +
+  geom_step(color = "gray", linewidth = 0.8) +
+  geom_text(aes(label = Site), color = "red", size = 3) +
+  labs(title = "物种丰富度 vs. 上下游梯度", 
+       x = "站点编号", y = "物种丰富度") +
+  theme_minimal()
+
+p5b <- ggplot(site_richness, aes(x = x, y = y)) +
+  geom_path(data = spa_df, color = "lightblue", linewidth = 0.8) +
+  geom_point(aes(size = Richness), color = "brown", alpha = 0.7) +
+  scale_size_continuous(range = c(2, 8)) +
+  labs(title = "物种丰富度分布图", x = "x坐标(公里)", y = "y坐标(公里)") +
+  coord_fixed(ratio = 1) +
+  theme_bw()
+
+
+# 显示所有图形 ----------------------------------------------------------
+#结果解释：横轴表示多度等级（物种的多度值），纵轴表示频次（该多度等级出现的次数）。 通过条形图可以直观地看到不同多度等级的物种数量分布情况，例如，低多度值的物种可能较多，而高多度值的物种较少，这有助于了解群落中物种的多度分布特征。
+print(p1)
+
+#以站点的空间坐标（x 和 y）为横纵轴，绘制了站点的位置。使用geom_path绘制了站点之间的连线，表示采样路径或空间顺序。通过 geom_text 在每个站点位置标注了站点编号，方便识别。添加了独立文本标注“上游”和“下游”，用于指示采样区域的地理方向，有助于理解站点的空间分布与生态梯度的关系。
+print(p2)
+
+#结果解释：选择了几种特定的物种（如褐鳟、茴鱼等），绘制了它们在不同站点的空间分布情况。使用分面绘图（facet_wrap）将不同物种的分布图分开显示，便于对比不同物种的分布模式。点的大小表示物种的多度值，颜色统一为红色，透明度设置为0.7，便于观察点的重叠情况。通过这种可视化方式，可以直观地看到每个物种在不同站点的分布密度和空间聚集情况，以及它们在上下游梯度上的分布差异。
+print(p3)
+
+#结果解释：
+#物种出现次数：横轴表示物种的出现次数（即物种在多少个站点中出现），纵轴表示物种数。直方图展示了不同出现次数的物种数量分布，例如，出现次数较少的物种可能较多，而出现次数较多的物种较少，这反映了群落中物种的稀有性和普遍性分布特征。
+#物种相对频率：横轴表示物种的相对频率（物种出现次数占总站点数的百分比），纵轴表示物种数。直方图展示了不同相对频率的物种数量分布，有助于了解群落中物种的分布均匀性，例如，相对频率较低的物种可能较多，而相对频率较高的物种较少，这可能与群落的生态特性和物种的生态位有关。
+print(p4)
+
+#结果解释：
+#物种丰富度 vs. 上下游梯度：横轴表示站点编号，纵轴表示物种丰富度（即每个站点中出现的物种数）。使用阶梯图（geom_step）表示物种丰富度随站点编号的变化趋势，同时在每个站点位置标注了站点编号。通过这种可视化方式，可以直观地看到物种丰富度在上下游梯度上的变化趋势，例如，物种丰富度可能在上游或下游较高，这可能与环境梯度（如水流速度、水质等）有关。
+#物种丰富度分布图：以站点的空间坐标（x和y）为横纵轴，绘制了物种丰富度的空间分布情况。点的大小表示物种丰富度，颜色统一为红色，透明度设置为0.7，便于观察点的重叠情况。通过这种可视化方式，可以直观地看到物种丰富度在空间上的分布差异，以及与站点位置的关系，例如，物种丰富度可能在某些区域较高，这可能与当地的生态环境和资源分布有关。
+print(p5a + p5b + plot_layout(ncol = 2))
+
+
+
+
+
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

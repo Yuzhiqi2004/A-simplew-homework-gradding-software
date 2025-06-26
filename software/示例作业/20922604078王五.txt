@@ -1,0 +1,428 @@
+---
+title: "数量生态学-R语言作业"
+author: "20222604032吕文伟"
+format: html
+editor: visual
+---
+
+# 加载包、函数和数据 ====
+
+```{r}
+
+
+library(vegan)       # 生态学数据分析
+library(leaflet)     # 交互式地图
+library(labdsv)      # 生态学数据分析工具
+
+```
+
+You can add options to executable code like this
+
+# 
+
+# 解释：[加载数据。 Doubs.Rdata 在工作目录中]{.smallcaps}
+
+# [文件 Doubs.RData 包含以下对象：]{.smallcaps}
+
+# [spe: 物种（群落）数据框（鱼类丰度）]{.smallcaps}
+
+# [env: 环境数据框]{.smallcaps}
+
+# [spa: 空间数据框 - 笛卡尔坐标]{.smallcaps}
+
+# [fishtraits: 鱼类功能性状]{.smallcaps}
+
+# [latlong: 空间数据框 - 纬度和经度]{.smallcaps}
+
+```{r}
+load("./NEwR-2ed_code_data/NEwR2-Data/Doubs.RData")
+```
+
+# 解释：查看数据框 ====
+
+```{r}
+spe                       # 在控制台显示整个数据框
+# 不推荐用于大型数据集！
+spe[1:5, 1:10]            # 仅显示前5行和前10列
+head(spe)                 # 仅显示前6行
+tail(spe)                 # 仅显示最后6行
+nrow(spe)                 # 行数（站点数）
+ncol(spe)                 # 列数（物种数）
+dim(spe)                  # 数据框维度（行数，列数）
+colnames(spe)             # 列标签（描述符=物种）
+rownames(spe)             # 行标签（对象=站点）
+summary(spe)              # 各列的描述性统计
+
+```
+
+# 解释：利用函数查看丰度（优势度代码）的整体分布 ====
+
+```{r}
+# 整个数据集中丰度值的最小和最大值
+range(spe)
+# 每个物种的最小和最大值
+apply(spe, 2, range)
+# 统计每个丰度类别的出现次数
+(ab <- table(unlist(spe)))
+# 创建带标题的图形窗口
+dev.new(title = "丰度类别分布", 
+        noRStudioGD = TRUE)
+# 绘制所有物种合并的丰度分布条形图
+barplot(ab, 
+        las = 1,
+        xlab = "丰度类别",
+        ylab = "频率",
+        col = gray(5 : 0 / 5))
+# 计算零值（缺失值）的数量
+sum(spe == 0)
+# 计算群落数据集中零值的比例
+sum(spe == 0) / (nrow(spe) * ncol(spe))
+
+```
+
+# 解释：查看站点位置地图 ====
+
+```{r}
+# 新建图形窗口
+dev.new(title = "站点位置", width = 9, noRStudioGD = TRUE)
+# 创建空白框架（比例1:1，带标题）
+# 使用spa数据框中的地理坐标x和y
+plot(spa, 
+     asp = 1, 
+     type = "n", 
+     main = "站点位置", 
+     xlab = "x坐标（公里）", 
+     ylab = "y坐标（公里）")
+# 添加连接Doubs河沿岸站点的蓝色线条
+lines(spa, col = "lightblue")
+# 添加站点标签
+text(spa, row.names(spa), cex = 1, col = "red")
+# 添加文字标注
+text(68, 20, "上游", cex = 1.2, col = "red")
+text(15, 35, "下游", cex = 1.2, col = "red")
+
+
+```
+
+# 解释：使用leaflet - 动态地图
+
+# 在Open Street Map背景上投影站点
+
+# leaflet使用查看器面板显示输出。
+
+# 从RStudio调用时有效，但从R控制台调用时不再有效。
+
+```{r}
+longitude <- latlong$LongitudeE
+latitude <- latlong$LatitudeN
+site <- as.character(latlong$Site)
+background <- addTiles(leaflet())
+mymap1 <-
+  addMarkers(
+    background,
+    lng = longitude,
+    lat = latitude,
+    label = site,
+    labelOptions = labelOptions(noHide = TRUE, textOnly = FALSE))
+mymap1
+
+```
+
+# 解释：查看部分鱼类物种分布地图 ====
+
+```{r}
+# 新建图形窗口
+dev.new(title = "物种分布", 
+        width = 11, 
+        height = 8,
+        noRStudioGD = TRUE)
+# 将绘图窗口分为4个区域，每行2个
+par(mfrow = c(2, 2))
+# 绘制四个物种的分布
+plot(spa, 
+     asp = 1, 
+     cex.axis = 0.8, 
+     col = "brown", 
+     cex = spe$Satr, 
+     main = "褐鳟", 
+     xlab = "x坐标（公里）", 
+     ylab = "y坐标（公里）")
+lines(spa, col = "lightblue")
+plot(spa, 
+     asp = 1, 
+     cex.axis = 0.8, 
+     col = "brown", 
+     cex = spe$Thth, 
+     main = "茴鱼", 
+     xlab = "x坐标（公里）", 
+     ylab = "y坐标（公里）")
+lines(spa, col = "lightblue")
+plot(spa, 
+     asp = 1, 
+     cex.axis = 0.8, 
+     col = "brown", 
+     cex = spe$Baba, 
+     main = "鲃鱼", 
+     xlab = "x坐标（公里）", 
+     ylab = "y坐标（公里）")
+lines(spa, col = "lightblue")
+plot(spa, 
+     asp = 1, 
+     cex.axis = 0.8, 
+     col = "brown", 
+     cex = spe$Abbr, 
+     main = "欧鲌", 
+     xlab = "x坐标（公里）", 
+     ylab = "y坐标（公里）")
+lines(spa, col = "lightblue")
+
+```
+
+# 解释：利用比较物种：出现频次 ====
+
+```{r}
+# 计算每个物种出现的站点数量
+# 对列求和，apply()的第二个参数MARGIN设为2z
+spe.pres <- apply(spe > 0, 2, sum)
+# 按升序排序结果
+sort(spe.pres)
+# 计算百分比频率
+spe.relf <- 100 * spe.pres / nrow(spe)
+# 将排序后的结果四舍五入到1位小数
+round(sort(spe.relf), 1)
+# 绘制直方图
+dev.new(title = "频率直方图", 
+        width = 8, 
+        height = 5,
+        noRStudioGD = TRUE)
+# 水平分割窗口
+par(mfrow = c(1, 2))
+hist(spe.pres, 
+     main = "物种出现频次", 
+     right = FALSE, 
+     las = 1, 
+     xlab = "出现次数", 
+     ylab = "物种数量", 
+     breaks = seq(0, 30, by = 5),
+     col = "bisque")
+hist(spe.relf, 
+     main = "物种相对频率", 
+     right = FALSE, 
+     las = 1,
+     xlab = "出现频率（%）", 
+     ylab = "物种数量",
+     breaks = seq(0, 100, by = 10),
+     col = "bisque")
+
+
+# 比较站点：物种丰富度 ====
+
+# 计算每个站点的物种数量
+# 对行求和，apply()的第二个参数MARGIN设为1
+sit.pres <- apply(spe > 0, 1, sum)
+# 按升序排序结果
+sort(sit.pres)
+dev.new(title = "物种丰富度", 
+        width = 12, 
+        height = 5,
+        noRStudioGD = TRUE)
+par(mfrow = c(1, 2))
+# 绘制物种丰富度与站点沿河流位置的关系
+plot(sit.pres,
+     type = "s",
+     las = 1, 
+     col = "gray",
+     main = "物种丰富度 vs. \n 上下游梯度",
+     xlab = "站点编号", 
+     ylab = "物种丰富度")
+text(sit.pres, row.names(spe), cex = .8, col = "red")
+# 使用地理坐标绘制气泡图
+plot(spa, 
+     asp = 1, 
+     main = "物种丰富度地图", 
+     pch = 21, 
+     col = "white", 
+     bg = "brown", 
+     cex = 5 * sit.pres / max(sit.pres), 
+     xlab = "x坐标（公里）", 
+     ylab = "y坐标（公里）")
+lines(spa, col = "lightblue")
+```
+
+# 物种数据的转换和标准化 =====
+
+```{r}
+# 获取decostand()函数的帮助
+?decostand
+
+
+## 简单转换 ====
+
+# 查看原始数据（丰度代码）的部分内容
+spe[1:5, 2:4]
+# 将丰度转换为存在-缺失（1-0）
+spe.pa <- decostand(spe, method = "pa")
+spe.pa[1:5, 2:4]
+
+
+## 按列（物种）标准化 ====
+
+# 通过除以每个物种的最大值来缩放丰度
+# 注意：参数"max"的MARGIN = 2（列，默认值）
+spe.scal <- decostand(spe, "max")
+spe.scal[1:5, 2:4]
+# 显示每个转换列的最大值
+apply(spe.scal, 2, max)
+
+# 通过除以物种总和来缩放丰度
+# （按物种的相对丰度）
+# 注意：这里覆盖了"total"的默认MARGIN = 1参数
+spe.relsp <- decostand(spe, "total", MARGIN = 2)
+spe.relsp[1:5, 2:4]
+# 显示按列求和
+# 传统方法：apply(spe.relsp, 2, sum)
+colSums(spe.relsp)
+
+
+## 按行（站点）标准化 ====
+
+# 通过除以站点总和来缩放丰度
+# （按站点的相对丰度剖面）
+spe.rel <- decostand(spe, "total") # 默认MARGIN = 1
+spe.rel[1:5, 2:4]
+# 显示行向量的和以确认缩放是否正确
+rowSums(spe.rel)
+
+# 使每个行向量的长度（范数）为1
+# 这称为弦转换
+spe.norm <- decostand(spe, "normalize") # 默认MARGIN = 1
+spe.norm[1:5, 2:4]
+# 验证转换后行向量的范数
+# 编写一个计算向量x范数的一行函数
+vec.norm <- function(x) sqrt(sum(x ^ 2))
+# 然后，将该函数应用于矩阵spe.norm的行
+apply(spe.norm, 1, vec.norm)
+
+# 计算站点相对丰度的平方根
+# 这称为Hellinger转换
+spe.hel <- decostand(spe, "hellinger")
+spe.hel[1:5, 2:4]
+# 检查行向量的范数
+apply(spe.hel, 1, vec.norm)
+
+
+## 行列双重标准化 ====
+
+# 卡方转换
+spe.chi <- decostand(spe, "chi.square")
+spe.chi[1:5, 2:4]
+# 检查没有发现任何物种的站点8的情况
+spe.chi[7:9, ]
+# 注意：decostand对0/0生成了0值而不是NaN 
+
+# Wisconsin标准化
+# 丰度首先按物种最大值缩放，然后按站点总和缩放
+spe.wis <- wisconsin(spe)
+spe.wis[1:5, 2:4]
+```
+
+# 常见物种（石泥鳅，物种#4）转换后丰度的箱线图
+
+```{r}
+dev.new(title = "泥鳅", noRStudioGD = TRUE)
+par(mfrow = c(2, 2))
+boxplot(spe$Babl,
+        sqrt(spe$Babl), 
+        log1p(spe$Babl),
+        las = 1, 
+        main = "简单转换",
+        names = c("原始数据", "平方根", "对数"), 
+        col = "bisque")
+boxplot(spe.scal$Babl, 
+        spe.relsp$Babl,
+        las = 1, 
+        main = "按物种标准化",
+        names = c("最大值", "总和"), 
+        col = "lightgreen")
+boxplot(spe.hel$Babl, 
+        spe.rel$Babl, 
+        spe.norm$Babl,
+        las = 1, 
+        main = "按站点标准化",
+        names = c("Hellinger", "总和", "范数"), 
+        col = "lightblue")
+boxplot(spe.chi$Babl, 
+        spe.wis$Babl,
+        las = 1, 
+        main = "双重标准化",
+        names = c("卡方", "Wisconsin"), 
+        col = "orange")
+
+# 沿上下游梯度绘制原始和转换后的丰度
+dev.new(
+  title = "物种转换后的丰度", 
+  width = 9, 
+  height = 9,
+  noRStudioGD = TRUE)
+par(mfrow = c(2, 2))
+plot(env$dfs, 
+     spe$Satr, 
+     type = "l", 
+     col = 4, 
+     main = "原始数据",
+     xlab = "距源头的距离[公里]", 
+     ylab = "原始丰度代码")
+lines(env$dfs, spe$Thth, col = 3)
+lines(env$dfs, spe$Baba, col = "orange")
+lines(env$dfs, spe$Abbr, col = 2)
+lines(env$dfs, spe$Babl, col = 1, lty = "dotted")
+
+plot(env$dfs, 
+     spe.scal$Satr, 
+     type = "l", 
+     col = 4, 
+     main = "按最大值缩放的物种丰度",
+     xlab = "距源头的距离[公里]", 
+     ylab = "缩放后的丰度")
+lines(env$dfs, spe.scal$Thth, col = 3)
+lines(env$dfs, spe.scal$Baba, col = "orange")
+lines(env$dfs, spe.scal$Abbr, col = 2)
+lines(env$dfs, spe.scal$Babl, col = 1, lty = "dotted")
+
+plot(env$dfs, 
+     spe.hel$Satr, 
+     type = "l", 
+     col = 4, 
+     main =  "Hellinger转换后的丰度", 
+     xlab = "距源头的距离[公里]", 
+     ylab = "标准化丰度")
+lines(env$dfs, spe.hel$Thth, col = 3)
+lines(env$dfs, spe.hel$Baba, col = "orange")
+lines(env$dfs, spe.hel$Abbr, col = 2)
+lines(env$dfs, spe.hel$Babl, col = 1, lty = "dotted")
+
+plot(env$dfs, 
+     spe.chi$Satr, 
+     type = "l", 
+     col = 4, 
+     main = "卡方转换后的丰度", 
+     xlab = "距源头的距离[公里]", 
+     ylab = "标准化丰度")
+lines(env$dfs, spe.chi$Thth, col = 3)
+lines(env$dfs, spe.chi$Baba, col = "orange")
+lines(env$dfs, spe.chi$Abbr, col = 2)
+lines(env$dfs, spe.chi$Babl, col = 1, lty = "dotted")
+legend("topright", 
+       c("褐鳟", "茴鱼", "鲃鱼", "欧鲌", "石泥鳅"),
+       col = c(4, 3, "orange", 2, 1), 
+       lty = c(rep(1, 4), 3))
+
+```
+
+## 使用自定义比例尺转换鱼类丰度 ====
+
+```{r}
+current <- c(0, 1, 2, 3, 4, 5)
+converted <- c(0, 1, 5, 10, 20, 50)
+spe.conv <- abundtrans(spe, current, converted)
+```

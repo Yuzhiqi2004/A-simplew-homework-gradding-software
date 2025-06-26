@@ -1,0 +1,356 @@
+---
+title: "数量生态学R语言探索报告"
+author: "兰海蓉"
+format: html
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+Doubs = load("D:/20222604048兰海蓉_/NEwR-2ed_code_data/NEwR-2ed_code_data/NEwR2-Data/Doubs.RData")
+
+```
+
+解释：加载必要的R包 (tidyverse数据处理）和Doubs数据集。数据包含鱼类多度(spe)、环境数据(env)、空间坐标(spa)和地理坐标(atlong)。
+
+```{r}
+spe
+spe[1:5, 1:10]            # 仅显示前5行和前10列
+head(spe)                 # 显示前6行
+tail(spe)                 # 显示最后6行
+nrow(spe)                 # 行数（站点数）
+ncol(spe)                 # 列数（物种数）
+dim(spe)                  # 数据框维度（行数, 列数）
+colnames(spe)             # 列标签（物种名称）
+rownames(spe)             # 行标签（站点名称）
+summary(spe)              # 各列描述性统计
+
+
+```
+
+**输出解释**：
+
+-   前5行前10列展示数据集的紧凑视图
+
+-   head()显示数据框结构（样点×物种矩阵）
+
+-   tail()验证数据完整性，显示最后6个样点数
+
+-   数据包含30个沿河流梯度分布的样点
+
+-   涵盖27种鱼类物种
+
+-   每个样点的物种组成记录为绝对丰度值
+
+    ### 箱线图分析
+
+```{r}
+# 加载必要包
+library(ggplot2)
+library(tidyr)
+library(viridis)  # 用于配色
+
+# 将物种数据转为长格式（ggplot2标准格式）
+spe_long <- spe %>% 
+  pivot_longer(cols = everything(), 
+               names_to = "Species", 
+               values_to = "Abundance")
+
+# 绘制进阶箱线图
+ggplot(spe_long, aes(x = reorder(Species, Abundance, FUN = median), 
+                     y = Abundance)) +
+  # 箱线图层（带填充色和异常点标记）
+  geom_boxplot(aes(fill = Species), 
+               alpha = 0.7, 
+               outlier.color = "red",
+               outlier.shape = 8) +
+  # 使用viridis配色（plasma主题）
+  scale_fill_viridis_d(option = "plasma") +
+
+  # 标题和标签
+  labs(title = "Doubs河鱼类物种多度分布",
+       subtitle = "按物种中位数排序 | 多度等级: 0(缺失)-5(最高)",
+       x = "物种名称",
+       y = "多度等级",
+       caption = "数据来源: Borcard et al. 2018《Numerical Ecology with R》") +
+  # 主题美化
+  theme_bw(base_size = 12) +
+  theme(
+    legend.position = "none",  # 隐藏图例
+    axis.text.x = element_text(angle = 60, hjust = 1, size = 10),
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+    plot.subtitle = element_text(color = "gray40", hjust = 0.5),
+    panel.grid.major.x = element_blank()  # 隐藏垂直网格线
+  )
+
+
+```
+
+解释：箱线图揭示褐鳟为优势种，部分物种呈斑块分布，可视化设计优化信息解读，指导生态管理决策。
+
+## 丰度类别
+
+```{r}
+
+
+# 统计每个丰度类别的频次
+ab <- table(unlist(spe))
+ab_df <- as.data.frame(ab)
+names(ab_df) <- c("Abundance", "Frequency")
+
+# 创建丰度类别分布条形图
+ggplot(ab_df, aes(x = Abundance, y = Frequency)) +
+  geom_bar(stat = "identity", fill = gray.colors(nrow(ab_df), start = 0, end = 0.8)) +
+  labs(title = "丰度类别的分布",
+       x = "丰度类别",
+       y = "频率") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5),
+        plot.title = element_text(hjust = 0.5))
+
+# 计算零值的数量和比例
+zero_count <- sum(spe == 0)
+zero_proportion <- zero_count / (nrow(spe) * ncol(spe))
+
+cat("零值的数量:", zero_count, "\n")
+cat("零值的比例:", zero_proportion, "\n")
+```
+
+解释：统计物种丰度分布，绘制条形图展示各丰度类别的频率，并计算数据中零值（未出现物种）的数量及占比，反映群落数据的稀疏程度。零值比例 \>50% 通常认为数据稀疏，可能需零膨胀模型（如ZIP/ZINB）或稀疏性校正方法分析。
+
+## 样点空间分布
+
+```{r}
+# 空间坐标处理
+spa_df <- as.data.frame(spa) %>%
+  set_names(c("x", "y")) %>%
+  mutate(Site = rownames(.))
+
+# 绘制样点分布图
+ggplot(spa_df) +
+  geom_path(aes(x = x, y = y), color = "lightblue") +
+  geom_text(aes(x = x, y = y, label = Site), color = "black", size = 3) +
+  annotate("text", x = 68, y = 20, label = "上游", color = "black") +
+  annotate("text", x = 15, y = 35, label = "下游", color = "black") +
+  labs(
+    title = "样点沿河流梯度空间分布",
+    x = "河道距离（km）", 
+    y = "河岸距离（km）"
+  )
+```
+
+解释：样点沿河道弯曲走向分布，呈现显著梯度变化规律。编号1-30按河流流向顺序排列构成生态梯度序列，其空间排列直观展示河流生境条件的连续性渐变特征。
+
+## 交互式地图
+
+```{r}
+library(leaflet)
+
+# 假设 latlong 是一个包含经度、纬度和站点信息的数据框
+# latlong <- data.frame(LongitudeE = c(...), LatitudeN = c(...), Site = c(...), Altitude = c(...))
+
+# 创建基础地图画布
+geovis_map <- leaflet(options = leafletOptions(
+  attributionControl = FALSE,  # 隐藏默认版权信息
+  zoomSnap = 0.5,               # 启用中间缩放级别
+  minZoom = 9, maxZoom = 16    # 限制缩放范围
+))
+
+# 添加采样点图层
+sampling_map <- geovis_map %>% 
+  addMarkers(
+    lng = latlong$LongitudeE,
+    lat = latlong$LatitudeN,
+    label = paste("站点", latlong$Site, "| 海拔:", latlong$Altitude, "m"),
+    clusterOptions = markerClusterOptions(
+      spiderfyOnMaxZoom = TRUE,  # 最大缩放时展开重叠点
+      disableClusteringAtZoom = 14  # 14级后取消聚合
+    ),
+    group = "采样站点"
+  ) %>% 
+  addLayersControl(
+    baseGroups = c("采样站点"),
+    overlayGroups = "采样站点",
+    options = layersControlOptions(collapsed = FALSE)
+  ) %>% 
+  setView(
+    lng = median(latlong$LongitudeE), 
+    lat = median(latlong$LatitudeN), 
+    zoom = 11
+  ) %>% 
+  addScaleBar(position = "bottomleft")
+
+sampling_map
+```
+
+**交互功能说明：**
+
+1.  **双图层控制**：通过右上角控件切换卫星影像/标注图层
+
+2.  **智能聚合**：缩放时自动聚类显示站点密度（\<14级时）
+
+3.  **动态标签**：鼠标悬停显示站点编号及海拔信息
+
+4.  **自适应视图**：初始聚焦于采样区域中位数坐标点
+
+5.  **比例尺**：左下角显示米制比例尺
+
+    ## 物种分布可视化
+
+    ```{r}
+    library(ggplot2)
+    library(patchwork)
+    library(dplyr)
+
+    # 创建绘图函数避免重复代码
+    create_fish_plot <- function(species_data, species_name) {
+      ggplot(spa, aes(x = X, y = Y, color = species_data)) +
+        geom_point(aes(size = species_data), alpha = 0.6) +
+        geom_path() +
+        labs(title = species_name, 
+             x = "x coordinate (km)", 
+             y = "y coordinate (km)") +
+        theme(legend.position = "none")
+    }
+
+    # 使用函数创建每个鱼种的图
+    plots <- list(
+      create_fish_plot(spe$Satr, "Brown trout"),
+      create_fish_plot(spe$Thth, "Grayling"),
+      create_fish_plot(spe$Baba, "Barbel"),
+      create_fish_plot(spe$Abbr, "Common bream")
+    )
+
+    # 使用patchwork组合图形
+    final_plot <- wrap_plots(plots, ncol = 2, nrow = 2)
+    final_plot
+    ```
+
+-   解释
+
+-   棕鳟(Satr)主要分布在上游区域
+
+-   灰鱼(Thth)在中游丰度较高
+
+-   鲤鱼(Baba)和欧鳊(Abbr)则主要分布在下游区域
+
+## 物种出现频率分析
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(patchwork)
+
+# 计算每个物种出现的站点数
+spe_pres <- spe %>% 
+  summarise(across(everything(), ~sum(. > 0))) %>% 
+  pivot_longer(everything(), names_to = "species", values_to = "occurrences") %>% 
+  arrange(occurrences)
+
+# 排序并计算百分比频率
+spe_relf <- spe_pres %>% 
+  mutate(relative_frequency = 100 * occurrences / nrow(spe))
+
+# 输出结果四舍五入
+rounded_results <- round(spe_relf %>% 
+                          arrange(occurrences) %>% 
+                          pull(relative_frequency), 1)
+
+# 绘制直方图
+# 物种出现次数的直方图
+p5 <- ggplot(spe_pres, aes(x = occurrences)) +
+  geom_histogram(binwidth = 5, color = "black", fill = "blue") +
+  labs(title = "物种出现次数", x = "出现次数", y = "物种数量") +
+  theme_minimal()
+
+# 物种相对频率的直方图
+p6 <- ggplot(spe_relf, aes(x = relative_frequency)) +
+  geom_histogram(binwidth = 10, color = "black", fill = "blue") +
+  labs(title = "物种相对频率", x = "出现频率 (%)", y = "物种数量") +
+  theme_minimal()
+
+# 使用patchwork组合图层
+p56 <- p5 + p6
+
+# 输出结果
+print(rounded_results)
+print(p56)
+```
+
+-   解释
+
+-   多数物种呈现高频或低频分布，中频物种较少
+
+-   **生态启示**：指示生境偏好特化物种（低频）与广布物种（高频）共存
+
+## 物种丰富度沿河流梯度变化
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(patchwork)
+
+# 计算每个站点的物种丰富度
+sit_pres <- spe %>%
+  rowSums(. > 0) %>%
+  enframe(name = "site", value = "species_richness") %>% 
+  mutate(site = as.integer(site))
+
+# 绘制物种丰富度与站点位置（上游-下游梯度）的关系图
+p7 <- ggplot(sit_pres, aes(x = site, y = species_richness)) +
+  geom_step(color = "gray") +   # 绘制阶梯线图
+  geom_point(color = "gray") +
+  labs(title = "物种丰富度与 \n 上游-下游梯度的关系", 
+       x = "站点编号", 
+       y = "物种丰富度") +
+  theme_minimal() +
+  geom_text(aes(label = site), size = 3, color = "red", hjust = 1.5)
+
+# 使用地理坐标绘制气泡图
+p8 <- spa %>%
+  bind_cols(sit_pres) %>%
+  ggplot(aes(x = X, y = Y, size = species_richness)) +
+  geom_point(color = "brown", fill = "white", shape = 21) +
+  scale_size_continuous(range = c(1, 10)) +
+  labs(title = "物种丰富度地图", 
+       x = "x 坐标 (km)", 
+       y = "y 坐标 (km)") +
+  theme_minimal() +
+  geom_path(color = "light blue", linewidth = 0.8)
+
+# 使用patchwork组合图层
+p78 <- p7 + p8
+
+# 输出结果
+print(p78)
+```
+
+-   **物种丰富度与站点位置关系图（p7）**：
+
+    -   **X轴（站点编号）**：表示从上游到下游的样方编号。
+
+    -   **Y轴（物种丰富度）**：表示每个样方中记录到的物种数量。
+
+    -   **阶梯线图**：显示了物种丰富度沿河流梯度的变化趋势。
+
+    -   **点**：每个点代表一个样方的物种丰富度值。
+
+    -   **文本标签**：样方编号以红色文本形式标注在每个点旁边，便于识别。
+
+    这张图表明物种丰富度可能随着河流梯度（从上游到下游）的变化而变化，可以观察到物种丰富度的增加或减少趋势。
+
+-   readLines("作业8兰海蓉.qmd", encoding = "UTF-8")
+
+-   **物种丰富度地图（p8）**：
+
+    -   **X轴和Y轴（地理坐标）**：表示样方在地理空间中的位置，通常是河流的x坐标和y坐标。
+
+    -   **气泡大小**：表示每个样方的物种丰富度，气泡越大，物种丰富度越高。
+
+    -   **颜色**：气泡填充颜色为白色，边框颜色为棕色，颜色在这里主要用于区分不同的气泡。
+
+    -   **路径线**：蓝色的路径线表示样方沿河流梯度的分布。
+
+    这张图直观地展示了物种丰富度在河流不同位置的分布情况，可以帮助识别物种丰富度的热点区域或低物种丰富度区域。
